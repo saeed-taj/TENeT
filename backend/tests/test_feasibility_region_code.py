@@ -239,3 +239,53 @@ class TestFeasibilityEndpoint:
         assert response.status_code == 200
         assert data['cat_tier'] == 4
         assert 'mode_results' in data  # only present on the CAT-4 branch
+
+
+    def test_missing_distance_and_travel_time(self, client, db_session):
+        """
+        Documents current fail-open behavior: a data point with missing
+        distance_km/travel_time_minutes still reports FEASIBLE, since
+        check_access_gating() skips checks it can't evaluate rather than
+        failing them
+        """
+        upload = CATUpload(
+            filename='test_upload.csv', file_type='csv',
+            status='completed', records_processed=1, uploaded_by='test'
+        )
+        db_session.add(upload)
+        db_session.flush()
+
+        region = CATRegion(
+            region_code='AK-MISSING', region_name='Missing Data Community',
+            tier_level=1
+        )
+        db_session.add(region)
+        db_session.flush()
+
+        data_point = CATDataPoint(
+            upload_id=upload.id,
+            region_id=region.id,
+            region_code='AK-MISSING',
+            latitude=61.0, longitude=-149.0,
+            access_quality=75.0,
+            distance_km=None,           # missing
+            travel_time_minutes=None,   # missing
+            access_type='healthcare',
+            is_active=True
+        )
+        rule = CATGatingRule(
+            rule_name='Tier 1 Rules', tier_level=1,
+            min_access_score=60.0, max_distance_km=50.0,
+            max_travel_time=60.0, access_types=['healthcare'],
+            is_active=True, priority=1
+        )
+        db_session.add(rule)
+        db_session.add(data_point)
+        db_session.commit()
+
+        response = client.get('/api/cat/feasibility/AK-MISSING')
+        data = json.loads(response.data)
+
+        assert response.status_code == 200
+        assert data['feasible'] == True  # current (possibly unintended) behavior
+        assert data['decision'] == 'FEASIBLE'

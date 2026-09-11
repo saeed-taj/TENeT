@@ -31,12 +31,6 @@ class TestCatGating:
             priority = 1
         )
 
-        # we will create a mock db session here
-
-        # db_mock = Mock()
-
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rules]
-
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
             mock_get_rules.return_value = [rules]
 
@@ -47,12 +41,6 @@ class TestCatGating:
                 tier_level = 1
             )
             
-
-        # call the function being tested
-
-        # result = CATDataHandler.check_access_gating(db_mock, datapoint, 1)
-
-        # now assert 
 
 
         assert 'allowed' in result
@@ -90,12 +78,6 @@ class TestCatGating:
             is_active = True,
             priority = 1
         )
-
-
-        # db_mock = Mock()
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rule]
-
-        # result = CATDataHandler.check_access_gating(db_mock, datapoint , 1
         
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
                     mock_get_rules.return_value = [rules]
@@ -137,12 +119,6 @@ class TestCatGating:
             access_types = ['healthcare']
         )
 
-        # db_mock = Mock()
-
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rules]
-
-        # result = CATDataHandler.check_access_gating(db_mock, datapoint, 1)
-
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
                     mock_get_rules.return_value = [rules]
         
@@ -178,11 +154,6 @@ class TestCatGating:
             access_types = ['healthcare']
         )
     
-        # db_mock = Mock()
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rule]
-    
-        
-        # result = CATDataHandler.check_access_gating(db_mock, data_point, 1)
 
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
                     mock_get_rules.return_value = [rules]
@@ -220,11 +191,6 @@ class TestCatGating:
             access_types = ['healthcare', 'education', 'transport']  # 'water' not in list -> FAIL
         )
     
-        # db_mock = Mock()
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rule]
-    
-        
-        # result = CATDataHandler.check_access_gating(db_mock, data_point, 1)
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
                     mock_get_rules.return_value = [rules]
         
@@ -265,13 +231,6 @@ class TestCatGating:
             access_types = ['healthcare', 'education']
         )
 
-
-        # db_mock = Mock()
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rules]
-
-
-        # result = CATDataHandler.check_access_gating(db_mock, datapoint, 1)
-
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
                     mock_get_rules.return_value = [rules]
         
@@ -281,7 +240,6 @@ class TestCatGating:
                         data_point,
                         tier_level = 1
                     )
-
 
 
         assert result['allowed'] == False
@@ -311,12 +269,6 @@ class TestCatGating:
             access_type='healthcare'
         )
     
-        # Empty rule list..... no rules found
-        # db_mock = Mock()
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
-    
-        
-        # result = CATDataHandler.check_access_gating(db_mock, data_point, 1)
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
                     mock_get_rules.return_value = []
         
@@ -353,12 +305,6 @@ class TestCatGating:
             max_travel_time = 60.0,
             access_types = ['healthcare']
         )
-
-        # db_mock = Mock()
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rule]
-
-        
-        # result = CATDataHandler.check_access_gating(db_mock, data_point, 1)
 
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
                     mock_get_rules.return_value = [rules]
@@ -401,12 +347,6 @@ class TestCatGating:
             access_types = None           # No access types defined
         )
 
-        # db_mock = Mock()
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rule]
-
-        
-        # result = CATDataHandler.check_access_gating(db_mock, data_point, 1)
-
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
                     mock_get_rules.return_value = [rules]
         
@@ -422,7 +362,7 @@ class TestCatGating:
 
 
 
-    # testing the priority order heree
+    # testing the priority order here
     
     
     def test_all_rules_must_pass_regardless_of_priority(self):
@@ -454,11 +394,6 @@ class TestCatGating:
             max_distance_km=50.0, max_travel_time=60.0,
             access_types=['healthcare'], priority=1
         )
-
-        # db_mock = Mock()
-        # db_mock.query.return_value.filter.return_value.order_by.return_value.all.return_value = [rule_high, rule_low]
-
-        # result = CATDataHandler.check_access_gating(db_mock, data_point, 1)
 
         with patch.object(CATDataHandler, 'get_active_gating_rules') as mock_get_rules:
                     mock_get_rules.return_value = [rule_high, rule_low]

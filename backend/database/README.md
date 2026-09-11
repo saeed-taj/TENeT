@@ -231,7 +231,7 @@ The database includes indexes on frequently queried fields. For large datasets e
 Implementation Roadmap
 Customize gating rules by modifying the database/init_db.py file or utilizing the API endpoints to create custom rule sets.
 Import production data by preparing CSV or GeoJSON files according to the format specifications outlined in this guide.
-Develop frontend interface by connecting to the provided API endpoints for dat  a visualization and user interaction.
+Develop frontend interface by connecting to the provided API endpoints for data visualization and user interaction.
 Implement authentication by integrating with existing authentication systems to control access and permissions.
 Scale to production database by migrating to PostgreSQL with PostGIS when ready to deploy to production environments.
 
@@ -248,128 +248,85 @@ Database model definitions are found in: backend/database/models.py
 TENeT has two distinct concepts that are often confused:
 
 #### 1. CAT Classification (Static)
- **What**: A pre-computed tier (1 - 4) assigned to each community
- **When**: During data import from CSV files
- **Based on**: Transportation modes, infrastructure, population
- **Stored**: `CATRegion.tier_level`
- **Example**: A remote fly-in community might be classified as Tier 4
- **Purpose**: High-level categorization of access levels
+- **What**: A pre-computed tier (1-4) assigned to each community
+- **When**: During data import from CSV files
+- **Based on**: Transportation modes, infrastructure, population
+- **Stored**: `CATRegion.tier_level`
+- **Example**: A remote fly-in community might be classified as Tier 4
+- **Purpose**: High-level categorization of access levels
 
 #### 2. Feasibility Gating (Dynamic)
- **What**: A real-time check if a community passes tier-specific rules
- **When**: When the `/api/cat/feasibility/<region_code>` endpoint is called
- **Based on**: Current metrics (access quality, distance, travel time)
- **Stored**: Not stored - computed on demand
- **Example**: "Does this Tier 4 community actually have enough bandwidth for telehealth?"
- **Purpose**: Determine if telehealth is currently feasible
+- **What**: A real-time check if a community passes tier-specific rules
+- **When**: When `/api/cat/feasibility/<region_code>` is called
+- **Based on**: Current metrics (access quality, distance, travel time)
+- **Stored**: Not stored — computed on demand
+- **Example**: "Does this Tier 4 community actually have enough bandwidth for telehealth?"
+- **Purpose**: Determine if telehealth is currently feasible
 
 ### The `priority` Field
 
 The `priority` field on `CATGatingRule` determines **check order** when multiple rules exist for the same tier.
 
-#### Priority Rules:
-1. **Higher number = Higher priority** (checked first)
+- Higher number = higher priority (checked first)
+- Rules are sorted in descending order (`priority.desc()`)
+- The system checks **all** matching rules — it does not stop at the first failure
 
-2. Rules are sorted in **descending order** (`priority.desc()`)
-
-3. The system checks all rules (doesn't stop at first failure)
-
-#### Current Implementation:
-
+**Current implementation:**
+```python
 # get_active_gating_rules() sorts by priority descending
-
 query = query.order_by(CATGatingRule.priority.desc()).all()
+```
 
-# Example: If rules have priority 3, 1, 2
-# They will be checked as: 3 -> 2 -> 1
+**Why priority matters (future use case):** currently there is one rule per tier, so priority has no practical effect. If multiple active rules are ever added for the same tier, priority would determine which is checked first.
 
+> **Note:** Don't confuse `priority` with `tier_level`. Tier 1 = best access, Tier 4 = worst access. Priority 4 = checked first (higher number = higher priority) — these are unrelated scales.
 
-# Why Priority Matters (Future Use Case):
+### How Rules Are Seeded
 
-Currently: One rule per tier ,  priority has no practical effect
+Rules are created in `init_db.py::create_sample_gating_rules()`:
 
-Future: Multiple rules per tier → priority determines check order
-Example: Tier 1 could have:
-  - Priority 3: "Urban" rule (strictest, checked first)
-  - Priority 2: "Suburban" rule (medium, checked second)
-  - Priority 1: "Rural" rule (least strict, checked last)
-
-Important Note:
-
-Do not confuse priority with tier level!
-
-Tier 1 = Best access (least needy)
-
-Tier 4 = Worst access (most needy)
-
-Priority 4 = Checked first (higher number = higher priority)
-
-Priority 4 (Highest) which  Checked FIRST
-Priority 3             
-Priority 2             
-Priority 1 (Lowest) which Checked LAST
-
-# How Rules Are Seeded
-
-Rules are created in init_db.py::create_sample_gating_rules():
-
+```python
 rules = [
     {
         'rule_name': 'Tier 1 Basic Access',
         'tier_level': 1,
-        'min_access_score': 60.0,      # Strictest requirements
-        'priority': 1                   # Lowest priority
+        'min_access_score': 60.0,
+        'priority': 1
     },
     {
         'rule_name': 'Tier 4 Extreme Access',
         'tier_level': 4,
-        'min_access_score': CAT4_MIN_ACCESS_SCORE,  # = 30.0, still fairly lenient vs Tier 1's 60
-        'priority': 4                   # Highest priority
+        'min_access_score': CAT4_MIN_ACCESS_SCORE,  # 30.0
+        'priority': 4
     }
 ]
+```
 
-The check_access_gating() Flow
+### The `check_access_gating()` Flow
 
+```
 1. GET /api/cat/feasibility/<region_code> is called
-   │
-   then
-2. Get region's CAT tier from database (e.g Tier 1)
-   │
-   then
-3. Fetch data point for that region from database
-   │
-   then
-4. Call check_access_gating(db, data_point, tier_level = 1)
-   │
-   then
-5. get_active_gating_rules() queries database:
-    WHERE tier_level = 1
-    AND is_active = True
-    ORDER BY priority DESC
-   │
-   then
-6. Returns list of rules for that tier
-   │
-   then
-7. For EACH rule:
-    Check access_quality >= min_access_score?
-    Check distance_km <= max_distance_km?
-    Check travel_time_minutes <= max_travel_time?
-    Check access_type in access_types?
-   │
-   then
+2. Look up the region's CAT tier from the database (e.g. Tier 1)
+3. Fetch the region's latest data point
+4. Call check_access_gating(db, data_point, tier_level=1)
+5. get_active_gating_rules() queries:
+     WHERE tier_level = 1 AND is_active = True
+     ORDER BY priority DESC
+6. Returns the list of matching rules
+7. For EACH rule, check:
+     access_quality >= min_access_score?
+     distance_km <= max_distance_km?
+     travel_time_minutes <= max_travel_time?
+     access_type in access_types?
 8. Result:
-    allowed = True (ALL rules passed)
-    allowed = False (ANY rule failed)
-    failed_rules = List of failures with reasons
-    passed_rules = List of passed rules
-   │
-   then
-9. Return JSON response:
-   {
-     'region_code': 'AK-ANCHORAGE',
-     'feasible': True/False,
-     'decision': 'FEASIBLE' or 'NOT_FEASIBLE',
-     'explanation': '...',
-     'failed_gate': '...' (if not feasible)
-   }
+     allowed = True  (ALL rules passed)
+     allowed = False (ANY rule failed)
+9. Response:
+     {
+       "region_code": "AK-ANCHORAGE",
+       "feasible": true/false,
+       "decision": "FEASIBLE" or "NOT_FEASIBLE",
+       "explanation": "...",
+       "failed_gate": "..." (if not feasible)
+     }
+```
